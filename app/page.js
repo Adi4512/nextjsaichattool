@@ -1,27 +1,46 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Footer from "./components/Footer";
 
 export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [chatHistory, setChatHistory] = useState([]); // Changed from response to chatHistory
+  const [chatHistory, setChatHistory] = useState([]);
+  const [messageIdCounter, setMessageIdCounter] = useState(1);
   const [streaming, setStreaming] = useState("");
   const [streamResponse, setStreamResponse] = useState("");
 
+  // Helper function to get current time (client-side only)
+  const getCurrentTime = () => {
+    if (typeof window !== 'undefined') {
+      return new Date().toLocaleTimeString();
+    }
+    return '';
+  };
+
+  // Initialize timestamps on client side
+  useEffect(() => {
+    if (chatHistory.length > 0) {
+      setChatHistory(prev => prev.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp || getCurrentTime()
+      })));
+    }
+  }, []);
+
   const handleChat = async () => {
-    if (!message.trim() || loading) return; // Early return if message is empty or loading
+    if (!message.trim() || loading) return;
     
     const userMessage = message.trim();
     setLoading(true);
-    setMessage(""); // Clear input immediately
+    setMessage("");
 
     // Add user message to chat history
     const newUserMessage = {
-      id: Date.now(),
+      id: messageIdCounter,
       type: 'user',
       content: userMessage,
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: getCurrentTime()
     };
 
     try {
@@ -37,31 +56,37 @@ export default function Home() {
       
       // Add AI response to chat history
       const newAIMessage = {
-        id: Date.now() + 1,
+        id: messageIdCounter + 1,
         type: 'ai',
         content: data.response || "Sorry, I couldn't process that request.",
-        timestamp: new Date().toLocaleTimeString()
+        timestamp: getCurrentTime()
       };
 
       // Update chat history (keep only last 50 messages)
       setChatHistory(prev => {
         const updated = [...prev, newUserMessage, newAIMessage];
-        return updated.slice(-50); // Keep only last 50 messages
+        return updated.slice(-50);
       });
+
+      // Increment counter for next messages
+      setMessageIdCounter(prev => prev + 2);
 
     } catch (error) {
       // Add error message to chat history
       const errorMessage = {
-        id: Date.now() + 1,
+        id: messageIdCounter + 1,
         type: 'error',
         content: "Error: " + error.message,
-        timestamp: new Date().toLocaleTimeString()
+        timestamp: getCurrentTime()
       };
 
       setChatHistory(prev => {
         const updated = [...prev, newUserMessage, errorMessage];
         return updated.slice(-50);
       });
+
+      // Increment counter for next messages
+      setMessageIdCounter(prev => prev + 2);
     }
 
     setLoading(false);
@@ -194,56 +219,72 @@ export default function Home() {
         </div>
 
         {/* Features Section */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Features Section */}
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
        
-  {/* Card 1 */}
-  <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.1s'}}>
-    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float">
-      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-      </svg>
-    </div>
-    <h3 className="text-lg font-semibold text-white mb-2">
-      Chugli & Gossip like Full-Tu Aunty
-    </h3>
-    <p className="text-gray-400 text-sm">
-      Discuss your neighbor’s Wi-Fi password, rishtas, or random celeb drama — 
-      AI aunty never runs out of masala! 😏
-    </p>
-  </div>
+       {/* Card 1 */}
+       <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.1s'}}>
+         <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float">
+           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+           </svg>
+         </div>
+         <h3 className="text-lg font-semibold text-cyan-300 mb-2">
+           🗣️ Chugli & Gossip like Full-Tu Aunty
+         </h3>
+         <p className="text-cyan-200/80 text-sm">
+           Discuss your neighbor's Wi-Fi password, rishtas, or random celeb drama — 
+           AI aunty never runs out of masala! 😏
+         </p>
+       </div>
 
-  {/* Card 2 */}
-  <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.2s'}}>
-    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float" style={{animationDelay: '0.5s'}}>
-      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-      </svg>
-    </div>
-    <h3 className="text-lg font-semibold text-white mb-2">
-      Gossip Faster than Shaadi.com Rishtas
-    </h3>
-    <p className="text-pink-400 text-sm">
-      Instant replies: funny, judgmental, and sometimes ego-hurting. 
-      Just like real aunties at kitty parties! 🫣
-    </p>
-  </div>
+       {/* Card 2 */}
+       <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.2s'}}>
+         <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float" style={{animationDelay: '0.5s'}}>
+           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+           </svg>
+         </div>
+         <h3 className="text-lg font-semibold text-pink-300 mb-2">
+           ⚡ Gossip Faster than Shaadi.com Rishtas
+         </h3>
+         <p className="text-pink-200/80 text-sm">
+           Instant replies: funny, judgmental, and sometimes ego-hurting. 
+           Just like real aunties at kitty parties! 🫣
+         </p>
+       </div>
 
-  {/* Card 3 */}
-  <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.3s'}}>
-    <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-red-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float" style={{animationDelay: '1s'}}>
-      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    </div>
-    <h3 className="text-lg font-semibold text-emerald-600 mb-2">
-      Aunty on Call, 24x7
-    </h3>
-    <p className="text-pink-400 text-sm">
-      Midnight? 4am? Doesn’t matter — AI aunty is always ready for 
-      “beta shaadi kab karoge” or spicy gossip! 💅
-    </p>
-  </div> 
-</div>
+       {/* Card 3 */}
+       <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.3s'}}>
+         <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-red-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float" style={{animationDelay: '1s'}}>
+           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+           </svg>
+         </div>
+         <h3 className="text-lg font-semibold text-emerald-300 mb-2">
+           �� Aunty on Call, 24x7
+         </h3>
+         <p className="text-emerald-200/80 text-sm">
+           Midnight? 4am? Doesn't matter — AI aunty is always ready for 
+           "beta shaadi kab karoge" or spicy gossip! 💅
+         </p>
+       </div> 
+     </div>
+
+     {/* Warning Section */}
+     <div className="mt-6 text-center">
+       <div className="glass rounded-xl p-4 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10">
+         <div className="flex items-center justify-center space-x-2 mb-2">
+           <span className="text-amber-400 text-lg">⚠️</span>
+           <span className="text-amber-300 font-semibold">Important Notice</span>
+         </div>
+         <p className="text-amber-200/80 text-sm">
+           �� Your conversations are <span className="font-semibold text-amber-300">NOT saved</span> to any database. 
+           If you refresh the page or close the browser, all your chugli will be lost! 
+           Keep screenshots of important gossip! 📸
+         </p>
+       </div>
+     </div>
 
 
         
