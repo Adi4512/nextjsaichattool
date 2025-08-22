@@ -10,7 +10,6 @@ export default function Home() {
   const [streaming, setStreaming] = useState("");
   const [streamResponse, setStreamResponse] = useState("");
 
-  // Helper function to get current time (client-side only)
   const getCurrentTime = () => {
     if (typeof window !== 'undefined') {
       return new Date().toLocaleTimeString();
@@ -18,7 +17,6 @@ export default function Home() {
     return '';
   };
 
-  // Initialize timestamps on client side
   useEffect(() => {
     if (chatHistory.length > 0) {
       setChatHistory(prev => prev.map(msg => ({
@@ -35,7 +33,6 @@ export default function Home() {
     setLoading(true);
     setMessage("");
 
-    // Add user message to chat history
     const newUserMessage = {
       id: messageIdCounter,
       type: 'user',
@@ -54,7 +51,6 @@ export default function Home() {
 
       const data = await res.json();
       
-      // Add AI response to chat history
       const newAIMessage = {
         id: messageIdCounter + 1,
         type: 'ai',
@@ -62,17 +58,14 @@ export default function Home() {
         timestamp: getCurrentTime()
       };
 
-      // Update chat history (keep only last 50 messages)
       setChatHistory(prev => {
         const updated = [...prev, newUserMessage, newAIMessage];
         return updated.slice(-50);
       });
 
-      // Increment counter for next messages
       setMessageIdCounter(prev => prev + 2);
 
     } catch (error) {
-      // Add error message to chat history
       const errorMessage = {
         id: messageIdCounter + 1,
         type: 'error',
@@ -85,7 +78,6 @@ export default function Home() {
         return updated.slice(-50);
       });
 
-      // Increment counter for next messages
       setMessageIdCounter(prev => prev + 2);
     }
 
@@ -94,7 +86,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
-      {/* Floating Particles */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-20 left-10 w-2 h-2 bg-purple-400 rounded-full animate-float opacity-60" style={{animationDelay: '0s', animationDuration: '3s'}}></div>
         <div className="absolute top-40 right-20 w-1 h-1 bg-blue-400 rounded-full animate-float opacity-40" style={{animationDelay: '1s', animationDuration: '4s'}}></div>
@@ -103,7 +94,7 @@ export default function Home() {
         <div className="absolute top-32 left-1/2 w-2 h-2 bg-blue-300 rounded-full animate-float opacity-70" style={{animationDelay: '1.5s', animationDuration: '4.5s'}}></div>
       </div>
       
-      {/* Header */}
+      
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-pink-600/20"></div>
         <div className="relative px-6 py-8 text-center">
@@ -116,10 +107,10 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Main Chat Container */}
+      
       <div className="max-w-4xl mx-auto px-6 pb-8 mt-3">
         <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl animate-pulse-glow">
-          {/* Chat Messages */}
+        
           <div className="p-6 min-h-[400px] max-h-[500px] overflow-y-auto">
             {chatHistory.length === 0 && (
               <div className="text-center text-gray-400 py-8">
@@ -172,7 +163,7 @@ export default function Home() {
             )}
           </div>
 
-          {/* Input Section */}
+         
           <div className="p-6 border-t border-white/10 glass">
             <div className="flex space-x-4">
               <div className="flex-1 relative">
@@ -218,8 +209,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Features Section */}
-            {/* Features Section */}
+       
             <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
        
        {/* Card 1 */}
@@ -238,7 +228,7 @@ export default function Home() {
          </p>
        </div>
 
-       {/* Card 2 */}
+   
        <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.2s'}}>
          <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float" style={{animationDelay: '0.5s'}}>
            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,7 +244,7 @@ export default function Home() {
          </p>
        </div>
 
-       {/* Card 3 */}
+  
        <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.3s'}}>
          <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-red-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float" style={{animationDelay: '1s'}}>
            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,7 +261,7 @@ export default function Home() {
        </div> 
      </div>
 
-     {/* Warning Section */}
+
      <div className="mt-6 text-center">
        <div className="glass rounded-xl p-4 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10">
          <div className="flex items-center justify-center space-x-2 mb-2">
@@ -279,7 +269,7 @@ export default function Home() {
            <span className="text-amber-300 font-semibold">Important Notice</span>
          </div>
          <p className="text-amber-200/80 text-sm">
-           �� Your conversations are <span className="font-semibold text-amber-300">NOT saved</span> to any database. 
+           �� Your conversations are <span className="font-semibold text-amber-300">NOT saved</span>. 
            If you refresh the page or close the browser, all your chugli will be lost! 
            Keep screenshots of important gossip! 📸
          </p>
@@ -291,7 +281,6 @@ export default function Home() {
         
       </div>
       
-      {/* Footer */}
       <Footer />
     </div>
   );
