@@ -316,7 +316,7 @@ export default function Home() {
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Spill the tea... ☕ What's the latest gossip?"
+                  placeholder="Aao Bhen Chugli kare...☕"
                   className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/30 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none transition-all duration-200 text-sm"
                   style={{ minHeight: "48px", maxHeight: "120px" }}
                   onKeyDown={(e) => {
