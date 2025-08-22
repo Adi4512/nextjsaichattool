@@ -106,7 +106,7 @@ Built with love (and lots of chai ☕) by **[Aditya Sharma](https://adisharma.de
 
 ### English:
 - **You**: "I'm thinking of changing my job"
-- **Aunty**: "Beta, job change kar rahe ho? Good! But first shaadi kar lo, then job change karna. Life mein priorities samajh lo! 💅✨"
+- **Aunty**: "Beta, you are changing jobs, but first, try to get married! 💅✨"
 
 ### Hindi:
 - **You**: "Aunty ji, maine weight gain kar liya hai"
