@@ -1,87 +1,216 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Footer from "./components/Footer";
 
 export default function Home() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState([]);
-  const [messageIdCounter, setMessageIdCounter] = useState(1);
   const [streaming, setStreaming] = useState("");
   const [streamResponse, setStreamResponse] = useState("");
+  const [isClient, setIsClient] = useState(false);
+  const chatContainerRef = useRef(null);
+
+  // Generate unique message ID
+  const generateMessageId = () => {
+    const id = Date.now() + Math.random().toString(36).substr(2, 9);
+//console.log("🔑 Generated message ID:", id);
+    return id;
+  };
+
+  // Auto-scroll to bottom when new messages arrive
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  // Scroll to bottom when chat history changes
+  useEffect(() => {
+    scrollToBottom();
+  }, [chatHistory]);
+
+  // Scroll to bottom when streaming response updates
+  useEffect(() => {
+    if (streaming && streamResponse) {
+      scrollToBottom();
+    }
+  }, [streamResponse, streaming]);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const getCurrentTime = () => {
-    if (typeof window !== 'undefined') {
+    if (isClient) {
       return new Date().toLocaleTimeString();
     }
     return '';
   };
 
   useEffect(() => {
-    if (chatHistory.length > 0) {
+    if (chatHistory.length > 0 && isClient) {
       setChatHistory(prev => prev.map(msg => ({
         ...msg,
         timestamp: msg.timestamp || getCurrentTime()
       })));
     }
-  }, []);
+  }, [isClient]);
 
-  const handleChat = async () => {
+  // Debug: Log chat history changes
+  useEffect(() => {
+    if (chatHistory.length > 0) {
+   //   console.log("🔍 Chat history updated:", chatHistory.map(msg => ({ id: msg.id, type: msg.type, content: msg.content.substring(0, 20) + "..." })));
+    }
+  }, [chatHistory]);
+
+  const handleChatStream = async () => {
     if (!message.trim() || loading) return;
     
     const userMessage = message.trim();
+  //  console.log("💬 User message:", userMessage);
+    
     setLoading(true);
     setMessage("");
+    setStreaming(true);
+    setStreamResponse("");
 
+    // Generate unique IDs for both messages
+    const userMessageId = generateMessageId();
+    const aiMessageId = generateMessageId();
+    
     const newUserMessage = {
-      id: messageIdCounter,
+      id: userMessageId,
       type: 'user',
       content: userMessage,
       timestamp: getCurrentTime()
     };
 
+    // Add user message to chat history immediately
+  //  console.log("📝 Adding user message with ID:", userMessageId);
+    setChatHistory(prev => {
+      const updated = [...prev, newUserMessage];
+      //console.log("📚 Updated chat history:", updated.map(msg => ({ id: msg.id, type: msg.type })));
+      return updated;
+    });
+    
     try {
-      const res = await fetch("/api/chat", {
+    //  console.log("🌐 Making API request to /api/chat-stream...");
+      const startTime = Date.now();
+      
+      const res = await fetch("/api/chat-stream", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({ message: userMessage })
       });
 
-      const data = await res.json();
-      
+      const responseTime = Date.now() - startTime;
+    // console.log(`⏱️ API response received in ${responseTime}ms, status:`, res.status);
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+     // console.log("📡 Starting to read stream...");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = "";
+      let chunkCount = 0;
+      let firstChunkTime = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+       //   console.log("🏁 Stream reading completed");
+          break;
+        }
+
+        chunkCount++;
+        const chunk = decoder.decode(value);
+     //   console.log(`📥 Raw chunk ${chunkCount}:`, chunk);
+        
+        const lines = chunk.split("\n");
+     //   console.log(`📝 Split into ${lines.length} lines:`, lines);
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const dataContent = line.slice(6);
+         //   console.log(`🔍 Processing data line:`, dataContent);
+            
+            // Check if stream is done
+            if (dataContent === "[DONE]") {
+          //    console.log("✅ Received [DONE] signal");
+              break;
+            }
+            
+            try {
+              const data = JSON.parse(dataContent);
+           //   console.log(`📊 Parsed data:`, data);
+              
+              if (data.content) {
+                // Handle first chunk immediately
+                if (data.first) {
+                  firstChunkTime = Date.now();
+                  const timeToFirstChunk = firstChunkTime - startTime;
+            //      console.log(`⚡ First chunk received in ${timeToFirstChunk}ms:`, data.content);
+                  setStreamResponse(data.content);
+                  fullResponse = data.content;
+                } else {
+                  fullResponse += data.content;
+             //     console.log(`📝 Updated response (${fullResponse.length} chars):`, data.content);
+                  setStreamResponse(fullResponse);
+                }
+              }
+            } catch (parseError) {
+           //   console.log("❌ Parse error:", parseError, "for line:", dataContent);
+            }
+          }
+        }
+      }
+
+      const totalTime = Date.now() - startTime;
+     // console.log(`🎯 Streaming completed in ${totalTime}ms. Final response:`, fullResponse);
+
+      // Add AI response to chat history with the pre-assigned ID
       const newAIMessage = {
-        id: messageIdCounter + 1,
+        id: aiMessageId,
         type: 'ai',
-        content: data.response || "Sorry, I couldn't process that request.",
+        content: fullResponse || "Sorry, I couldn't process that request.",
         timestamp: getCurrentTime()
       };
 
+    //  console.log("🤖 Adding AI message with ID:", aiMessageId);
       setChatHistory(prev => {
-        const updated = [...prev, newUserMessage, newAIMessage];
+        const updated = [...prev, newAIMessage];
+       // console.log("📚 Final chat history:", updated.map(msg => ({ id: msg.id, type: msg.type })));
         return updated.slice(-50);
       });
 
-      setMessageIdCounter(prev => prev + 2);
-
     } catch (error) {
+    //  console.error("❌ Streaming error:", error);
+      
+      // Add error message with the pre-assigned AI message ID
       const errorMessage = {
-        id: messageIdCounter + 1,
+        id: aiMessageId,
         type: 'error',
         content: "Error: " + error.message,
         timestamp: getCurrentTime()
       };
 
       setChatHistory(prev => {
-        const updated = [...prev, newUserMessage, errorMessage];
+        const updated = [...prev, errorMessage];
         return updated.slice(-50);
       });
-
-      setMessageIdCounter(prev => prev + 2);
     }
 
     setLoading(false);
+    setStreaming(false);
+    setStreamResponse("");
   };
 
   return (
@@ -108,55 +237,72 @@ export default function Home() {
       </div>
 
       
-      <div className="max-w-4xl mx-auto px-6 pb-8 mt-3">
-        <div className="glass-dark rounded-2xl border border-white/10 shadow-2xl animate-pulse-glow">
+      <div className="max-w-4xl mx-auto px-4 pb-4 mt-2">
+        <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/20 shadow-lg">
         
-          <div className="p-6 min-h-[400px] max-h-[500px] overflow-y-auto">
+          <div className="p-4 min-h-[500px] max-h-[600px] overflow-y-auto" ref={chatContainerRef}>
             {chatHistory.length === 0 && (
-              <div className="text-center text-gray-400 py-8">
-                <p>Start a conversation! Type your message below. 💬</p>
+              <div className="text-center text-gray-400 py-12">
+                <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mx-auto mb-4 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-300 mb-2">Welcome to Chugli Central! 💬</h3>
+                <p className="text-gray-400 text-sm max-w-sm mx-auto">
+                  Your AI Aunty is ready to spill some tea! 🍵 
+                  <br />
+                  <span className="text-purple-300">No judgment, just pure gossip energy! ✨</span>
+                </p>
               </div>
             )}
             
             {chatHistory.map((msg) => (
-              <div key={msg.id} className={`mb-6 animate-slide-in-right ${msg.type === 'user' ? 'flex justify-end' : ''}`}>
-                <div className={`flex items-start space-x-3 ${msg.type === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 animate-float ${
+              <div key={msg.id} className={`mb-4 ${msg.type === 'user' ? 'flex justify-end' : ''}`}>
+                <div className={`flex items-start gap-3 max-w-[85%] ${msg.type === 'user' ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                     msg.type === 'user' 
                       ? 'bg-gradient-to-r from-blue-500 to-cyan-500' 
                       : msg.type === 'error'
                       ? 'bg-gradient-to-r from-red-500 to-pink-500'
                       : 'bg-gradient-to-r from-purple-500 to-pink-500'
                   }`}>
-                    <span className="text-white text-sm font-bold">
-                      {msg.type === 'user' ? 'You' : msg.type === 'error' ? '!' : 'BFF'}
+                    <span className="text-white text-xs font-bold">
+                      {msg.type === 'user' ? 'U' : msg.type === 'error' ? '!' : 'A'}
                     </span>
                   </div>
-                  <div className={`glass rounded-2xl p-4 border flex-1 hover-lift max-w-[80%] ${
+                  <div className={`rounded-2xl px-4 py-3 ${
                     msg.type === 'user' 
-                      ? 'border-blue-500/30 bg-blue-500/20' 
+                      ? 'bg-blue-500 text-white' 
                       : msg.type === 'error'
-                      ? 'border-red-500/30 bg-red-500/20'
-                      : 'border-purple-500/30'
+                      ? 'bg-red-500/20 text-red-200 border border-red-500/30'
+                      : 'bg-gray-700/50 text-gray-200 border border-gray-600/30'
                   }`}>
-                    <p className="text-gray-200 leading-relaxed">{msg.content}</p>
-                    <p className="text-xs text-gray-400 mt-2">{msg.timestamp}</p>
+                    <p className="text-sm leading-relaxed">{msg.content}</p>
+                    <p className="text-xs opacity-70 mt-2">{isClient ? msg.timestamp : ''}</p>
                   </div>
                 </div>
               </div>
             ))}
             
             {loading && (
-              <div className="mb-6 animate-slide-in-right">
-                <div className="flex items-start space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 animate-float">
-                    <span className="text-white text-sm font-bold">BFF</span>
+              <div className="mb-4">
+                <div className="flex items-start gap-3 max-w-[85%]">
+                  <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-white text-xs font-bold">A</span>
                   </div>
-                  <div className="glass rounded-2xl p-4 border border-purple-500/30 flex-1">
-                    <div className="flex items-center space-x-2">
+                  <div className="bg-gray-700/50 text-gray-200 border border-gray-600/30 rounded-2xl px-4 py-3">
+                    <div className="flex items-center gap-2">
                       <div className="w-4 h-4 border-2 border-purple-400/30 border-t-purple-400 rounded-full animate-spin"></div>
-                      <span className="text-gray-300">Thinking...</span>
+                      <span className="text-sm">
+                        {streaming ? "Typing..." : "Thinking..."}
+                      </span>
                     </div>
+                    {streaming && streamResponse && (
+                      <div className="mt-3 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                        <p className="text-gray-200 text-sm leading-relaxed">{streamResponse}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -164,44 +310,44 @@ export default function Home() {
           </div>
 
          
-          <div className="p-6 border-t border-white/10 glass">
-            <div className="flex space-x-4">
+          <div className="p-4 border-t border-white/10 bg-gray-800/30">
+            <div className="flex gap-3">
               <div className="flex-1 relative">
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Type your message here..."
-                  className="w-full px-4 py-3 glass border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none transition-all duration-200 input-magic"
-                  style={{ minHeight: "60px", maxHeight: "120px" }}
+                  placeholder="Spill the tea... ☕ What's the latest gossip?"
+                  className="w-full px-4 py-3 bg-gray-700/50 border border-gray-600/30 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none transition-all duration-200 text-sm"
+                  style={{ minHeight: "48px", maxHeight: "120px" }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       if (message.trim() && !loading) {
-                        handleChat();
+                        handleChatStream();
                       }
                     }
                   }}
                 />
                 <div className="absolute bottom-2 right-2 text-xs text-gray-500">
-                  Press Enter to send
+                  Enter to send
                 </div>
               </div>
               <button
-                onClick={handleChat}
+                onClick={handleChatStream}
                 disabled={loading || !message.trim()}
-                className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-500 disabled:to-gray-600 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed shadow-lg hover:shadow-xl btn-magic"
+                className="px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-500 disabled:to-gray-600 text-white font-medium rounded-2xl transition-all duration-200 transform hover:scale-105 disabled:transform-none disabled:cursor-not-allowed shadow-lg text-sm flex-shrink-0"
               >
                 {loading ? (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Thinking...</span>
+                    <span className="text-sm">Thinking...</span>
                   </div>
                 ) : (
-                  <div className="flex items-center space-x-2">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
-                    <span>Send</span>
+                    <span className="text-sm">Send</span>
                   </div>
                 )}
               </button>
@@ -209,52 +355,52 @@ export default function Home() {
           </div>
         </div>
 
-       
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Move the feature cards below and make them smaller to focus on chat */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
        
        {/* Card 1 */}
-       <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.1s'}}>
-         <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float">
-           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+       <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 text-center">
+         <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg mx-auto mb-2 flex items-center justify-center">
+           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
            </svg>
          </div>
-         <h3 className="text-lg font-semibold text-cyan-300 mb-2">
+         <h3 className="text-sm font-medium text-cyan-300 mb-1">
            🗣️ Chugli & Gossip like Full-Tu Aunty
          </h3>
-         <p className="text-cyan-200/80 text-sm">
+         <p className="text-cyan-200/80 text-xs">
            Discuss your neighbor's Wi-Fi password, rishtas, or random celeb drama — 
            AI aunty never runs out of masala! 😏
          </p>
        </div>
 
    
-       <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.2s'}}>
-         <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float" style={{animationDelay: '0.5s'}}>
-           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+       <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 text-center">
+         <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg mx-auto mb-2 flex items-center justify-center">
+           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
            </svg>
          </div>
-         <h3 className="text-lg font-semibold text-pink-300 mb-2">
+         <h3 className="text-sm font-medium text-pink-300 mb-1">
            ⚡ Gossip Faster than Shaadi.com Rishtas
          </h3>
-         <p className="text-pink-200/80 text-sm">
+         <p className="text-pink-200/80 text-xs">
            Instant replies: funny, judgmental, and sometimes ego-hurting. 
            Just like real aunties at kitty parties! 🫣
          </p>
        </div>
 
   
-       <div className="glass rounded-xl p-6 border border-white/10 text-center hover-lift animate-slide-in-left" style={{animationDelay: '0.3s'}}>
-         <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-red-500 rounded-xl mx-auto mb-4 flex items-center justify-center animate-float" style={{animationDelay: '1s'}}>
-           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+       <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 text-center">
+         <div className="w-8 h-8 bg-gradient-to-r from-pink-500 to-red-500 rounded-lg mx-auto mb-2 flex items-center justify-center">
+           <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
            </svg>
          </div>
-         <h3 className="text-lg font-semibold text-emerald-300 mb-2">
-           �� Aunty on Call, 24x7
+         <h3 className="text-sm font-medium text-emerald-300 mb-1">
+           🕐 Aunty on Call, 24x7
          </h3>
-         <p className="text-emerald-200/80 text-sm">
+         <p className="text-pink-200/80 text-xs">
            Midnight? 4am? Doesn't matter — AI aunty is always ready for 
            "beta shaadi kab karoge" or spicy gossip! 💅
          </p>
@@ -262,23 +408,19 @@ export default function Home() {
      </div>
 
 
-     <div className="mt-6 text-center">
-       <div className="glass rounded-xl p-4 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-orange-500/10">
-         <div className="flex items-center justify-center space-x-2 mb-2">
-           <span className="text-amber-400 text-lg">⚠️</span>
-           <span className="text-amber-300 font-semibold">Important Notice</span>
+     <div className="mt-4 text-center">
+       <div className="bg-gray-800/30 rounded-lg p-3 border border-amber-500/30">
+         <div className="flex items-center justify-center gap-2 mb-2">
+           <span className="text-amber-400 text-base">🤫</span>
+           <span className="text-amber-300 font-medium text-sm">Top Secret Notice</span>
          </div>
-         <p className="text-amber-200/80 text-sm">
-           �� Your conversations are <span className="font-semibold text-amber-300">NOT saved</span>. 
-           If you refresh the page or close the browser, all your chugli will be lost! 
-           Keep screenshots of important gossip! 📸
+         <p className="text-amber-200/80 text-xs leading-relaxed">
+           💬 Your chats are <span className="font-medium text-amber-300">super secret</span> because I'm too lazy to add a database! 😅 
+           <br />
+           <span className="text-amber-300/80">Translation:</span> Your gossip is safe from prying eyes, but don't refresh or I'll forget everything! 📸
          </p>
        </div>
-     </div>
-
-
-        
-        
+     </div>  
       </div>
       
       <Footer />
