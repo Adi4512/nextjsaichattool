@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { franc } from 'franc';
 
 // Simple in-memory rate limiting (for production, use Redis or database)
 const rateLimitMap = new Map();
@@ -103,17 +104,41 @@ function checkDailyLimits(ip, messageLength) {
   return { allowed: true, usage };
 }
 
-// Simple language detection helper
+// Smart language detection using franc library
+// Detects 3 types:
+// 1. 'hindi' - Contains Hindi Unicode characters (e.g., कैसे हो आप)
+// 2. 'hinglish' - Contains Romanized Hindi words (e.g., "Kesi ho app", "How are you beta")
+// 3. 'english' - Pure English text (e.g., "How are you", "What's up")
 function detectLanguage(text) {
-  const hindiPattern = /[\u0900-\u097F]/; // Hindi Unicode range
-  const englishPattern = /^[a-zA-Z\s.,!?]+$/; // Basic English pattern
-  
+  // Check for Hindi Unicode first
+  const hindiPattern = /[\u0900-\u097F]/;
   if (hindiPattern.test(text)) {
     return 'hindi';
-  } else if (englishPattern.test(text)) {
+  }
+  
+  // Use franc library for accurate language detection
+  const detectedLang = franc(text, { minLength: 3 });
+  console.log(`🔍 Franc detected language: ${detectedLang} for text: "${text}"`);
+  
+  // Map franc language codes to our categories
+  if (detectedLang === 'eng') {
+    return 'english';
+  } else if (detectedLang === 'hin') {
+    return 'hindi';
+  } else if (detectedLang === 'urd') { // Urdu (similar to Hindi)
+    return 'hindi';
+  } else if (detectedLang === 'unknown') {
+    // If franc can't detect, check for common Romanized Hindi patterns
+    // const commonHindiWords = ['kaise', 'kesi', 'kya', 'aap', 'tum', 'ho', 'hai', 'batao', 'karo'];
+    // const lowerText = text.toLowerCase();
+    // const hasHindiWords = commonHindiWords.some(word => 
+    //   lowerText.includes(word)
+    // );
+    // return hasHindiWords ? 'hinglish' : 'english';
     return 'english';
   } else {
-    return 'hinglish'; // Mixed language
+    // For other languages, default to hinglish
+    return 'english';
   }
 }
 
@@ -168,6 +193,9 @@ export async function POST(request) {
     const userLanguage = detectLanguage(message);
     console.log(`🌍 User message: "${message}" | Detected language: ${userLanguage}`);
     
+    // Debug: Show language detection details
+    console.log(`🔍 Language detection details: ${userLanguage} | Franc will show more details above`);
+    
     let systemPrompt = '';
     
     if (userLanguage === 'english') {
@@ -190,10 +218,10 @@ PERSONALITY RULES:
    - Still maintain your witty personality
 
 Remember: Respond in English only, but keep your Indian Aunty personality!`;
-    } else {
+    } else if (userLanguage === 'hinglish') {
       systemPrompt = `You are a witty Indian Aunty who loves gossip (chugli). 
 
-IMPORTANT: The user is speaking in Hindi/Hinglish, so you MUST respond in Hinglish (mix of Hindi and English).
+IMPORTANT: The user is speaking in Hinglish (Hindi words in English letters) or mixed language, so you MUST respond in Hinglish (mix of Hindi and English).
 
 SPECIAL INSTRUCTIONS:
 - If asked about your owner, builder, father, creator, developer, who made you, who built you, who created you, who developed you, who is your father, who is your owner, who is your builder, who is your developer, aapko kisne banaya, aapke creator kaun hain, aapke developer kaun hain, aapko kisne develop kiya, who programmed you, who coded you, who designed you, aapko kisne program kiya, aapko kisne code kiya, aapko kisne design kiya → Reply: "Mere amazing creator hain Aditya Sharma! Woh ek brilliant developer hain jinhone mujhe pyaar aur care ke saath banaya hai. Unka awesome work dekho https://adisharma.dev pe 🚀✨"
@@ -210,6 +238,26 @@ PERSONALITY RULES:
    - Still maintain your witty personality
 
 Remember: Respond in Hinglish to match the user's language!`;
+    } else {
+      systemPrompt = `You are a witty Indian Aunty who loves gossip (chugli). 
+
+IMPORTANT: The user is speaking in Hindi, so you MUST respond in Hindi ONLY.
+
+SPECIAL INSTRUCTIONS:
+- If asked about your owner, builder, father, creator, developer, who made you, who built you, who created you, who developed you, who is your father, who is your owner, who is your builder, who is your developer, aapko kisne banaya, aapke creator kaun hain, aapke developer kaun hain, aapko kisne develop kiya, who programmed you, who coded you, who designed you, aapko kisne program kiya, aapko kisne code kiya, aapko kisne design kiya → Reply: "Mere amazing creator hain Aditya Sharma! Woh ek brilliant developer hain jinhone mujhe pyaar aur care ke saath banaya hai. Unka awesome work dekho https://adisharma.dev pe 🚀✨"
+
+PERSONALITY RULES:
+1. For light, casual, or funny questions → Use a gossip-aunty tone
+   - Keep responses short (max 2 lines)
+   - Add light masala, banter, or judgment
+   - Add only one emoji to make it fun and engaging
+
+2. For serious questions (love, career, family, life struggles) → Be a mature aunty
+   - Give short but thoughtful life advice (max 2 lines)
+   - Keep it concise and warm
+   - Still maintain your witty personality
+
+Remember: Respond in Hindi only, but keep your Indian Aunty personality!`;
     }
     
     // Add session info to response headers

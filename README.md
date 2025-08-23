@@ -49,6 +49,7 @@ Your AI Aunty embodies the classic Indian aunty traits:
 - **Streaming**: Real-time Server-Sent Events (SSE)
 - **Rate Limiting**: Built-in protection against abuse
 - **Mobile**: Responsive design for all devices
+--**language**:Used Franc library for 380+ language detection and better flexibility.
 
 ## 🎨 Creator
 
