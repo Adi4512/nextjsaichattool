@@ -128,16 +128,8 @@ function detectLanguage(text) {
   } else if (detectedLang === 'urd') { // Urdu (similar to Hindi)
     return 'hindi';
   } else if (detectedLang === 'unknown') {
-    // If franc can't detect, check for common Romanized Hindi patterns
-    // const commonHindiWords = ['kaise', 'kesi', 'kya', 'aap', 'tum', 'ho', 'hai', 'batao', 'karo'];
-    // const lowerText = text.toLowerCase();
-    // const hasHindiWords = commonHindiWords.some(word => 
-    //   lowerText.includes(word)
-    // );
-    // return hasHindiWords ? 'hinglish' : 'english';
     return 'english';
   } else {
-    // For other languages, default to hinglish
     return 'english';
   }
 }
