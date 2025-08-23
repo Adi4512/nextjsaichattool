@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/next';
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -30,6 +31,7 @@ export default function RootLayout({ children }) {
          className="geist-sans geist-mono antialiased"
       >
         {children}
+        <Analytics />
       </body>
     </html>
   );
